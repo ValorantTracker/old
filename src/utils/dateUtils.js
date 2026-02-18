@@ -17,7 +17,8 @@ export function calculateAverageDate(tracks) {
         if (!releaseDate) return;
 
         const date = new Date(releaseDate);
-        if (!isNaN(date.getTime())) {
+        // Ensure date is valid and year is reasonable (e.g. > 1000) to avoid "0000" or bad data
+        if (!isNaN(date.getTime()) && date.getFullYear() > 1000) {
             totalTimestamp += date.getTime();
             count++;
         }
@@ -32,13 +33,16 @@ export function getOldestTracks(tracks, limit = 10) {
     if (!tracks) return [];
 
     return tracks
-        .filter(item => item.track && item.track.album && item.track.album.release_date)
+        .filter(item => {
+            const releaseDate = item.track?.album?.release_date;
+            if (!releaseDate) return false;
+            const date = new Date(releaseDate);
+            // Filter out invalid dates or years < 1000 (like "0000")
+            return !isNaN(date.getTime()) && date.getFullYear() > 1000;
+        })
         .sort((a, b) => {
             const dateA = new Date(a.track.album.release_date);
             const dateB = new Date(b.track.album.release_date);
-            // Valid dates first
-            if (isNaN(dateA)) return 1;
-            if (isNaN(dateB)) return -1;
             return dateA - dateB;
         })
         .slice(0, limit);

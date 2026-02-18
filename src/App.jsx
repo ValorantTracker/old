@@ -26,8 +26,10 @@ function App() {
 
       if (code) {
         try {
-          // Clean URL
-          window.history.replaceState({}, document.title, window.location.pathname);
+          // Clean URL (remove 'code' but keep the path)
+          const cleanUrl = new URL(window.location.href);
+          cleanUrl.searchParams.delete("code");
+          window.history.replaceState({}, document.title, cleanUrl.toString());
           const accessToken = await getAccessToken(code);
           setToken(accessToken);
           localStorage.setItem("spotify_token", accessToken);

@@ -1,6 +1,6 @@
 const CLIENT_ID = import.meta.env.VITE_SPOTIFY_CLIENT_ID;
 // Automatically detect the current URL (including subdirectory like /old/)
-const REDIRECT_URI = import.meta.env.VITE_REDIRECT_URI || window.location.origin + window.location.pathname;
+const REDIRECT_URI = import.meta.env.VITE_REDIRECT_URI || window.location.origin + import.meta.env.BASE_URL;
 const SCOPES = ["playlist-read-private", "playlist-read-collaborative"];
 
 /**

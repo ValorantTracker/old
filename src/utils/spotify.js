@@ -1,7 +1,7 @@
 const CLIENT_ID = import.meta.env.VITE_SPOTIFY_CLIENT_ID;
 // Automatically detect the current URL (including subdirectory like /old/)
 const REDIRECT_URI = import.meta.env.VITE_REDIRECT_URI || window.location.origin + import.meta.env.BASE_URL;
-const SCOPES = ["playlist-read-private", "playlist-read-collaborative"];
+const SCOPES = ["playlist-read-private", "playlist-read-collaborative", "user-library-read"];
 
 /**
  * Generates a random string for the state and code verifier
@@ -116,4 +116,58 @@ export async function fetchPlaylistTracks(token, url) {
         headers: { Authorization: `Bearer ${token}` }
     });
     return await result.json();
+}
+
+export async function fetchUserPlaylists(token) {
+    let playlists = [];
+    let nextUrl = "https://api.spotify.com/v1/me/playlists?limit=50";
+
+    while (nextUrl) {
+        const result = await fetch(nextUrl, {
+            method: "GET",
+            headers: { Authorization: `Bearer ${token}` }
+        });
+        const data = await result.json();
+        playlists = playlists.concat(data.items);
+        nextUrl = data.next;
+    }
+    return playlists;
+}
+
+export async function fetchSavedTracks(token) {
+    // For Liked Songs, we might just want to get the total count first or fetch them all.
+    // Fetching ALL liked songs can be heavy (thousands). 
+    // For now, let's treat "Liked Songs" as a special playlist ID 'me/tracks' 
+    // but the API is different. 
+    // We will need a custom fetcher for Liked Songs or adapt fetchPlaylist.
+
+    // Let's return a metadata object for the UI to display "Liked Songs" folder.
+    const result = await fetch("https://api.spotify.com/v1/me/tracks?limit=1", {
+        method: "GET",
+        headers: { Authorization: `Bearer ${token}` }
+    });
+    const data = await result.json();
+    return {
+        id: 'liked-songs',
+        name: 'Liked Songs',
+        images: [{ url: 'https://misc.scdn.co/liked-songs/liked-songs-300.png' }], // Standard Liked Songs cover
+        tracks: { total: data.total },
+        owner: { display_name: 'You' }
+    };
+}
+
+export async function fetchAllSavedTracks(token) {
+    let tracks = [];
+    let nextUrl = "https://api.spotify.com/v1/me/tracks?limit=50";
+
+    while (nextUrl) {
+        const result = await fetch(nextUrl, {
+            method: "GET",
+            headers: { Authorization: `Bearer ${token}` }
+        });
+        const data = await result.json();
+        tracks = tracks.concat(data.items);
+        nextUrl = data.next;
+    }
+    return { tracks: { items: tracks } };
 }

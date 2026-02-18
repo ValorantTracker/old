@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { getAccessToken, fetchPlaylist } from './utils/spotify';
+import { getAccessToken, fetchPlaylist, fetchUserPlaylists, fetchSavedTracks, fetchAllSavedTracks } from './utils/spotify';
 import { getOldestTracks, calculateAverageDate } from './utils/dateUtils';
 import Login from './components/Login';
 import PlaylistInput from './components/PlaylistInput';
+import PlaylistLibrary from './components/PlaylistLibrary';
 import Leaderboard from './components/Leaderboard';
 import Stats from './components/Stats';
 import { Loader2 } from 'lucide-react';
@@ -10,6 +11,10 @@ import { Loader2 } from 'lucide-react';
 function App() {
   const [token, setToken] = useState(null);
   const [loadingConfig, setLoadingConfig] = useState(true);
+
+  // Library State
+  const [library, setLibrary] = useState(null);
+  const [loadingLibrary, setLoadingLibrary] = useState(false);
 
   // Analysis State
   const [analyzing, setAnalyzing] = useState(false);
@@ -49,8 +54,35 @@ function App() {
     checkAuth();
   }, []);
 
+  // Fetch Library when authenticated
+  useEffect(() => {
+    if (!token) return;
+
+    const loadLibrary = async () => {
+      setLoadingLibrary(true);
+      try {
+        const [playlists, likedSongs] = await Promise.all([
+          fetchUserPlaylists(token),
+          fetchSavedTracks(token) // Metadata only
+        ]);
+        // Combine Liked Songs + Playlists
+        setLibrary([likedSongs, ...playlists]);
+      } catch (err) {
+        console.error("Failed to load library", err);
+        if (err.status === 401) {
+          setToken(null);
+          localStorage.removeItem("spotify_token");
+        }
+      } finally {
+        setLoadingLibrary(false);
+      }
+    };
+
+    loadLibrary();
+  }, [token]);
+
   const handleAnalyze = async (id, type) => {
-    if (type !== 'spotify') {
+    if (type !== 'spotify' && type !== 'liked-songs') {
       setError('YouTube support coming soon!');
       return;
     }
@@ -59,13 +91,31 @@ function App() {
     setError('');
     setPlaylistData(null);
     setAnalyzedTracks([]);
+    // Scroll to top
+    window.scrollTo({ top: 0, behavior: 'smooth' });
 
     try {
-      const data = await fetchPlaylist(token, id);
+      let data;
+      let tracks;
+
+      if (type === 'liked-songs') {
+        const result = await fetchAllSavedTracks(token);
+        // Construct a fake playlist object for the UI
+        data = {
+          name: 'Liked Songs',
+          external_urls: { spotify: 'https://open.spotify.com/collection/tracks' },
+          images: [{ url: 'https://misc.scdn.co/liked-songs/liked-songs-300.png' }],
+          tracks: result.tracks
+        };
+        tracks = result.tracks.items; // These have the { added_at, track: {...} } structure
+      } else {
+        data = await fetchPlaylist(token, id);
+        tracks = data.tracks.items;
+      }
+
       setPlaylistData(data);
 
       // Process Data
-      const tracks = data.tracks.items;
       const oldest = getOldestTracks(tracks, 50); // Get top 50, display top 10? Leaderboard handles display.
       const avg = calculateAverageDate(tracks);
 
@@ -94,7 +144,7 @@ function App() {
 
   return (
     <div className="min-h-screen bg-neutral-950 text-white flex flex-col items-center py-12 px-4 font-sans">
-      <div className="w-full max-w-5xl space-y-12">
+      <div className="w-full max-w-6xl space-y-12">
         <header className="text-center space-y-4">
           <h1 className="text-5xl md:text-7xl font-extrabold bg-gradient-to-r from-green-400 to-emerald-600 bg-clip-text text-transparent tracking-tighter">
             Playlist Time Machine
@@ -109,10 +159,26 @@ function App() {
             <Login />
           ) : (
             <div className="w-full space-y-12 animate-fade-in-up">
-              <div className="text-center">
+              <div className="text-center max-w-xl mx-auto">
                 <PlaylistInput onAnalyze={handleAnalyze} isLoading={analyzing} />
                 {error && <p className="mt-4 text-red-400">{error}</p>}
               </div>
+
+              {!analyzing && !playlistData && (
+                <div className="w-full">
+                  {loadingLibrary ? (
+                    <div className="flex justify-center py-12">
+                      <Loader2 className="animate-spin text-neutral-600" size={32} />
+                    </div>
+                  ) : (
+                    <PlaylistLibrary
+                      playlists={library}
+                      onSelect={handleAnalyze}
+                      isLoading={analyzing}
+                    />
+                  )}
+                </div>
+              )}
 
               {analyzing && (
                 <div className="flex flex-col items-center justify-center space-y-4 py-12">

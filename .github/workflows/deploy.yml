@@ -21,7 +21,7 @@ jobs:
         env:
           # If you set this secret in GitHub repo settings, it will be used.
           # Otherwise, the app might need the user to provide it or it will be undefined.
-          VITE_SPOTIFY_CLIENT_ID: ${{ secrets.VITE_SPOTIFY_CLIENT_ID }}
+          VITE_SPOTIFY_CLIENT_ID: ${{ secrets.VITE_SPOTIFY_CLIENT_ID || vars.VITE_SPOTIFY_CLIENT_ID }}
 
       - name: Deploy
         uses: JamesIves/github-pages-deploy-action@v4
